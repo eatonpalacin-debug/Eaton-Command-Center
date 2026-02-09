@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
 ╔══════════════════════════════════════════════════════════════════╗
-║      CENTRO DE MANDO DE EATON — v7.0 · Surgical Upgrade          ║
-║      Citadel Quant Architecture · WHY? Cognitive Audit           ║
+║      CENTRO DE MANDO DE EATON — v8.0 · HFT-Ready Upgrade          ║
+║      Citadel Quant Architecture · WHY? LaTeX · AutoRefresh        ║
 ║                                                                  ║
-║  pip install streamlit plotly yfinance scipy pandas numpy        ║
+║  pip install streamlit plotly yfinance scipy pandas numpy         ║
+║  pip install streamlit-autorefresh                                ║
 ║  streamlit run eaton_command_center.py                           ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
@@ -13,12 +14,19 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 from scipy.stats import norm, jarque_bera, skew, kurtosis
 from datetime import datetime
 import warnings, time, hashlib
 
 warnings.filterwarnings("ignore")
+
+try:
+    from streamlit_autorefresh import st_autorefresh
+    AUTOREFRESH_OK = True
+except ImportError:
+    AUTOREFRESH_OK = False
 
 try:
     import yfinance as yf
@@ -165,6 +173,22 @@ ALL_CAT = {**UNIVERSE, **SYNTH}
 N_ASSETS = sum(len(v) for v in ALL_CAT.values())
 
 # ═══════════════════════════════════════════════════════════════════
+# HORIZONTE ESTRATÉGICO — Period/Interval mapping
+# ═══════════════════════════════════════════════════════════════════
+
+HORIZONS = {
+    "⚡ Streaming (Sim)": {"period": "1d",  "interval": None,  "label": "Streaming",  "days": 1},
+    "1 Minuto (7D)":      {"period": "7d",  "interval": "1m",  "label": "1min×7D",    "days": 7},
+    "5 Minutos (1M)":     {"period": "1mo", "interval": "5m",  "label": "5min×1M",    "days": 30},
+    "15 Minutos (1M)":    {"period": "1mo", "interval": "15m", "label": "15min×1M",   "days": 30},
+    "1 Hora (3M)":        {"period": "3mo", "interval": "1h",  "label": "1H×3M",      "days": 90},
+    "1 Día (1Y)":         {"period": "1y",  "interval": "1d",  "label": "1D×1Y",      "days": 252},
+    "1 Semana (2Y)":      {"period": "2y",  "interval": "1wk", "label": "1W×2Y",      "days": 504},
+    "1 Mes (5Y)":         {"period": "5y",  "interval": "1mo", "label": "1M×5Y",      "days": 1260},
+    "Trimestral (10Y)":   {"period": "10y", "interval": "3mo", "label": "3M×10Y",     "days": 2520},
+}
+
+# ═══════════════════════════════════════════════════════════════════
 # DATA ENGINE
 # ═══════════════════════════════════════════════════════════════════
 
@@ -188,21 +212,40 @@ def _synth_ohlcv(ticker, days=252):
     v=np.random.randint(1e6,8e7,days).astype(float)
     return pd.DataFrame({"Open":o,"High":h,"Low":l,"Close":px,"Volume":v},index=dt)
 
-@st.cache_data(ttl=120, show_spinner=False)
-def get_data(ticker, period="1y"):
-    dm = {"1mo":22,"3mo":66,"6mo":132,"1y":252,"2y":504}
+def _synth_streaming(ticker, bars=120):
+    """Generate simulated streaming data (sub-minute bars)."""
+    np.random.seed(abs(hash(ticker + str(int(time.time()//60))))%(2**31))
+    dt = pd.date_range(end=datetime.now(), periods=bars, freq="s")
+    base = 5000 + np.random.randn()*200
+    px = base + np.cumsum(np.random.randn(bars)*0.5)
+    px = np.maximum(px, 100)
+    h=px+np.abs(np.random.normal(0,0.3,bars))
+    l=px-np.abs(np.random.normal(0,0.3,bars))
+    o=l+(h-l)*np.random.random(bars)
+    v=np.random.randint(1e4,5e6,bars).astype(float)
+    return pd.DataFrame({"Open":o,"High":h,"Low":l,"Close":px,"Volume":v},index=dt)
+
+@st.cache_data(ttl=60, show_spinner=False)
+def get_data(ticker, period="1y", interval=None):
+    """Fetch data with optional interval. For intraday, interval must be set."""
     if _is_synth(ticker):
-        return _synth_ohlcv(ticker, dm.get(period,252))
+        dm = {"1d":1,"7d":7,"1mo":22,"3mo":66,"6mo":132,"1y":252,"2y":504,"5y":1260,"10y":2520}
+        if interval is None:  # Streaming sim
+            return _synth_streaming(ticker)
+        return _synth_ohlcv(ticker, dm.get(period, 252))
     if not YF_OK:
         return pd.DataFrame()
+    if interval is None:  # Streaming — use 1m with 1d for real tickers
+        interval = "1m"; period = "1d"
     try:
-        d = yf.download(ticker, period=period, progress=False, auto_adjust=True, timeout=15)
-        if d is not None and len(d)>5:
+        d = yf.download(ticker, period=period, interval=interval,
+                        progress=False, auto_adjust=True, timeout=15)
+        if d is not None and len(d) > 5:
             if isinstance(d.columns, pd.MultiIndex):
                 d.columns = d.columns.get_level_values(0)
             for c in ["Open","High","Low","Close","Volume"]:
                 if c not in d.columns:
-                    d[c] = d.get("Close", 0) if c!="Volume" else 0
+                    d[c] = d.get("Close", 0) if c != "Volume" else 0
             return d.dropna(subset=["Close"])
     except Exception as e:
         st.toast(f"⚠️ {ticker}: {str(e)[:60]}", icon="⚠️")
@@ -584,6 +627,73 @@ def render_sensitivity_module(ticker, rets, all_rets_dict):
                     unsafe_allow_html=True,
                 )
 
+# ───────────────────────────────────────────────────────────────────
+# WHY? LATEX DIAGNOSTICS — Chart-level Citadel diagnostics
+# ───────────────────────────────────────────────────────────────────
+
+CHART_WHY = {
+    "candles": {
+        "title": "Gráfico de Velas Japonesas + Bandas de Bollinger",
+        "concept": "Las velas japonesas representan precio de apertura, máximo, mínimo y cierre en cada período. "
+                   "Las Bandas de Bollinger son ±2σ alrededor de la SMA(20), midiendo volatilidad dinámica.",
+        "formula": r"BB_{upper} = SMA_{20} + 2\sigma_{20} \quad;\quad BB_{lower} = SMA_{20} - 2\sigma_{20}",
+        "macro": "El ancho de las bandas (Bollinger Width) anticipa regímenes de volatilidad. "
+                 "Bandas comprimidas preceden movimientos explosivos — el BCRP monitorea compresiones del USD/PEN.",
+    },
+    "vol_surface": {
+        "title": "Superficie de Volatilidad Implícita 3D",
+        "concept": "La superficie IV mapea la volatilidad implícita en función del strike (K/S) y el vencimiento (T). "
+                   "El 'smile' y 'skew' revelan cómo el mercado precia el riesgo de cola.",
+        "formula": r"\sigma_{IV}(K,T) = \sigma_{ATM} + a(K/S - 1)^2 + b\sqrt{T} - c(K/S-1)e^{-T}",
+        "macro": "El skew de volatilidad (diferencia IV puts vs calls) es el termómetro de miedo institucional. "
+                 "Citadel monitorea el 25-delta risk reversal como proxy de sentimiento.",
+    },
+    "distribution": {
+        "title": "Distribución de Retornos vs Normal Teórica",
+        "concept": "Compara retornos reales contra la distribución normal (gaussiana). "
+                   "Las desviaciones revelan asimetría (skew) y colas pesadas (kurtosis) que invalidan modelos estándar.",
+        "formula": r"f(x) = \frac{1}{\sigma\sqrt{2\pi}} e^{-\frac{(x-\mu)^2}{2\sigma^2}} \quad;\quad CVaR_{\alpha} = E[L \,|\, L \geq VaR_{\alpha}]",
+        "macro": "El test de Jarque-Bera determina si los retornos son normales. Si p<0.05, los modelos paramétricos "
+                 "son peligrosos. El BCRP usa distribuciones t-Student para modelar las reservas internacionales.",
+    },
+    "correlation": {
+        "title": "Matriz de Correlación Dinámica",
+        "concept": "Correlación de Pearson entre retornos mide co-movimiento lineal. "
+                   "ρ=+1 implica movimiento idéntico, ρ=-1 cobertura perfecta, ρ=0 independencia.",
+        "formula": r"\rho_{X,Y} = \frac{Cov(X,Y)}{\sigma_X \cdot \sigma_Y} = \frac{\sum(x_i - \bar{x})(y_i - \bar{y})}{\sqrt{\sum(x_i-\bar{x})^2 \cdot \sum(y_i-\bar{y})^2}}",
+        "macro": "Las correlaciones se disparan durante crisis (convergencia a 1.0), destruyendo diversificación. "
+                 "La correlación Cobre-PEN es clave para el BCRP: cuando sube cobre, el sol se fortalece.",
+    },
+    "choropleth": {
+        "title": "Mapa Geopolítico de Exposición por Revenue",
+        "concept": "Distribución geográfica del ingreso estimado. Mide concentración de riesgo país "
+                   "y exposición a shocks regionales (aranceles, sanciones, crisis).",
+        "formula": r"HHI = \sum_{i=1}^{N} s_i^2 \quad \text{(Herfindahl: concentración geográfica)}",
+        "macro": "Citadel ajusta exposición país según el riesgo geopolítico. Perú tiene exposición "
+                 "dual: cobre→China y oro→global. El BCRP monitorea la balanza comercial por destino.",
+    },
+    "macd_rsi": {
+        "title": "Indicadores de Momento: MACD y RSI",
+        "concept": "MACD captura cambios de tendencia via cruces de EMAs. RSI mide fuerza relativa "
+                   "de subidas vs bajadas en ventana de 14 períodos.",
+        "formula": r"MACD = EMA_{12} - EMA_{26} \quad;\quad RSI = 100 - \frac{100}{1 + \frac{Avg\,Gain}{Avg\,Loss}}",
+        "macro": "En Citadel, MACD se usa como filtro de régimen (alcista/bajista), no como señal aislada. "
+                 "Las divergencias RSI-precio anticipan reversiones con mayor probabilidad que cruces simples.",
+    },
+}
+
+def why_chart_diagnostic(chart_key, extra_interp=""):
+    """Render WHY? diagnostic expander with LaTeX formula for a chart."""
+    info = CHART_WHY.get(chart_key)
+    if not info:
+        return
+    with st.expander(f"🔍 WHY? — Diagnóstico Citadel: {info['title']}", expanded=False):
+        st.markdown(f"**📘 Concepto:** {info['concept']}")
+        st.latex(info["formula"])
+        if extra_interp:
+            st.markdown(f"**📊 Interpretación Quant:** {extra_interp}")
+        st.markdown(f"**🌐 Conexión Macro/BCRP:** {info['macro']}")
+
 # ═══════════════════════════════════════════════════════════════════
 # PLOTLY HELPERS — Clean, no deprecated props
 # ═══════════════════════════════════════════════════════════════════
@@ -622,7 +732,7 @@ def gauge(val, title, lo, hi, steps, suf=""):
 
 def ui_header():
     st.markdown('<div class="hdr"><h1>⚡ CENTRO DE MANDO DE EATON</h1>'
-                '<p>INSTITUTIONAL QUANT TERMINAL · CITADEL ARCHITECTURE · WHY? COGNITIVE AUDIT · v7.0</p></div>', unsafe_allow_html=True)
+                '<p>INSTITUTIONAL QUANT TERMINAL · CITADEL ARCHITECTURE · HFT-READY · v8.0</p></div>', unsafe_allow_html=True)
     now = datetime.now()
     st.markdown(f'<div class="sb">'
         f'<span>SID: <span style="color:{C["gold"]}">{st.session_state.sid}</span></span>'
@@ -643,7 +753,27 @@ def ui_sidebar():
         cat = st.selectbox("📂 CATEGORÍA", list(ALL_CAT.keys()))
         assets = ALL_CAT[cat]
         tick = st.selectbox("🎯 ACTIVO", list(assets.keys()), format_func=lambda x: f"{x} — {assets[x]}")
-        per = st.selectbox("📅 HORIZONTE", ["1mo","3mo","6mo","1y","2y"], index=3)
+
+        st.markdown("---"); st.markdown("##### ⏱️ HORIZONTE ESTRATÉGICO")
+        horizon_key = st.selectbox("📅 TEMPORALIDAD",
+            list(HORIZONS.keys()), index=5,
+            help="Streaming=simulado · 1min limita a 7D · Diario=estándar")
+        hz = HORIZONS[horizon_key]
+
+        # Auto-refresh toggle
+        st.markdown("---"); st.markdown("##### 🔄 MOTOR REAL-TIME")
+        auto_on = st.checkbox("⚡ Auto-refresh (60s)", value=False)
+        refresh_sec = st.slider("Intervalo (seg)", 15, 300, 60, 15,
+                                disabled=not auto_on) if auto_on else 60
+
+        if auto_on and AUTOREFRESH_OK:
+            st_autorefresh(interval=refresh_sec * 1000, limit=None, key="hft_refresh")
+            st.markdown(f'<div style="text-align:center;padding:4px;background:rgba(0,230,118,0.1);'
+                f'border-radius:4px;font-family:JetBrains Mono;font-size:.68rem;color:{C["green"]}">'
+                f'● LIVE — Refresh cada {refresh_sec}s</div>', unsafe_allow_html=True)
+        elif auto_on and not AUTOREFRESH_OK:
+            st.warning("Instala: `pip install streamlit-autorefresh`", icon="⚠️")
+
         st.markdown("---"); st.markdown("##### 📊 UNIVERSO")
         for cn, ca in ALL_CAT.items():
             with st.expander(f"{cn} ({len(ca)})"):
@@ -651,11 +781,11 @@ def ui_sidebar():
                     _c = C["text2"]
                     st.markdown(f"<span style='font-family:JetBrains Mono;font-size:.72rem;color:{_c}'>`{t}` {n}</span>", unsafe_allow_html=True)
         st.markdown("---")
-        if st.checkbox("🔄 Refresh cache"):
+        if st.checkbox("🗑️ Limpiar caché"):
             st.cache_data.clear()
         _cm = C["textm"]
-        st.markdown(f"<div style='text-align:center;font-size:.65rem;color:{_cm};font-family:JetBrains Mono'>EATON v7.0 · © {datetime.now().year}</div>", unsafe_allow_html=True)
-    return tick, per
+        st.markdown(f"<div style='text-align:center;font-size:.65rem;color:{_cm};font-family:JetBrains Mono'>EATON v8.0 · © {datetime.now().year}</div>", unsafe_allow_html=True)
+    return tick, hz
 
 # ═══════════════════════════════════════════════════════════════════
 # TAB 1 — RADAR GEOPOLÍTICO
@@ -688,6 +818,7 @@ def tab1_geo(tk, df, r):
             title=dict(text=f"Exposición — {tk}", font=dict(size=13,color=C["gold"])),
             margin=dict(l=0,r=0,t=45,b=0), geo=dict(bgcolor=C["bg"]))
         st.plotly_chart(fig, use_container_width=True)
+        why_chart_diagnostic("choropleth", "La concentración geográfica determina el riesgo idiosincrático país del activo.")
 
     with c2:
         st.markdown("##### 📐 Superficie Volatilidad 3D")
@@ -713,6 +844,10 @@ def tab1_geo(tk, df, r):
                 zaxis=dict(title=dict(text="IV%",font=dict(size=10)),backgroundcolor=C["bg"],gridcolor=C["grid"]),
                 bgcolor=C["bg"], camera=dict(eye=dict(x=1.5,y=-1.8,z=1.0))))
         st.plotly_chart(fig2, use_container_width=True)
+        skew_val = (vs[10,0] - vs[10,-1]) * 100  # IV at low strike vs high strike
+        why_chart_diagnostic("vol_surface",
+            f"ATM IV={atm*100:.1f}%, β={beta:.2f}. "
+            f"Skew={skew_val:.1f}pp — {'Mercado pagando prima por protección (puts caros)' if skew_val>0 else 'Demanda de calls supera puts'}")
 
     st.markdown("---"); st.markdown("##### 📡 Indicadores de Riesgo")
     bv = q_beta(r, r.shift(1).dropna()) if len(r)>10 else 1.0
@@ -748,7 +883,7 @@ def tab1_geo(tk, df, r):
 
 def tab2_audit(tk, df, r):
     st.markdown("### 🔬 Auditoría Cuantitativa — Expert Level")
-    bdf = get_data("^GSPC","1y")
+    bdf = get_data("^GSPC","1y","1d")
     br = qrets(bdf) if len(bdf)>5 else r*0.9
 
     ir = q_ir(r,br); sortino = q_sortino(r); cvar = q_cvar(r)
@@ -794,6 +929,10 @@ def tab2_audit(tk, df, r):
         title=dict(text=f"Distribución — {tk} (LIVE)",font=dict(size=13,color=C["gold"])),
         xaxis_title="Retorno %", yaxis_title="Freq", barmode="overlay")
     st.plotly_chart(fig, use_container_width=True)
+    jbs_val, jbp_val = jarque_bera(r) if len(r) > 10 else (0, 1)
+    why_chart_diagnostic("distribution",
+        f"Sharpe={sharpe:.3f}, CVaR₉₅={cvar*100:.2f}%, VaR₉₅={var95*100:.2f}%. "
+        f"JB p-value={jbp_val:.4f} → {'Retornos NO son normales — modelos gaussianos son peligrosos' if jbp_val < 0.05 else 'No se rechaza normalidad — modelos paramétricos válidos'}.")
 
 # ═══════════════════════════════════════════════════════════════════
 # TAB 3 — MAESTRO DE GRÁFICOS
@@ -856,6 +995,14 @@ def tab3_charts(tk, df, r):
     for a in fig["layout"]["annotations"]:
         a["font"]=dict(size=11,color=C["gold"],family="JetBrains Mono")
     st.plotly_chart(fig, use_container_width=True)
+    _last_rsi = rsi.iloc[-1] if len(rsi) > 0 and pd.notna(rsi.iloc[-1]) else 50
+    _last_macd = mh.iloc[-1] if len(mh) > 0 and pd.notna(mh.iloc[-1]) else 0
+    why_chart_diagnostic("candles",
+        f"RSI actual={_last_rsi:.1f} — {'Sobrecompra ⚠️' if _last_rsi > 70 else 'Sobreventa 🟢' if _last_rsi < 30 else 'Neutral'}. "
+        f"MACD Hist={'positivo → momento alcista 📈' if _last_macd > 0 else 'negativo → momento bajista 📉'}.")
+    why_chart_diagnostic("macd_rsi",
+        f"MACD Hist={_last_macd:.4f}, RSI={_last_rsi:.1f}. "
+        f"{'Señal: divergencia potencial detectada' if (_last_rsi > 70 and _last_macd < 0) or (_last_rsi < 30 and _last_macd > 0) else 'Sin divergencia RSI/MACD'}.")
 
     # Signals
     st.markdown("---")
@@ -893,18 +1040,26 @@ def tab3_charts(tk, df, r):
 
 def tab4_macro(tk, df, r):
     st.markdown("### 🛡️ Centinela Macro — Correlación Real-Time")
+
+    # Dynamic correlation window selector
+    max_window = min(len(df) - 1, 252)
+    default_window = min(90, max_window)
+    corr_window = st.slider("📐 Ventana de correlación (días/barras)",
+        min_value=10, max_value=max_window, value=default_window, step=5,
+        help="Ajusta la ventana temporal para calcular correlaciones. Menor=más reactivo, Mayor=más estable.")
+
     macro = {"GC=F":"Oro","HG=F":"Cobre","USDPEN=X":"Sol","^VIX":"VIX",
              "CL=F":"WTI","^GSPC":"S&P500","BTC-USD":"BTC","EURUSD=X":"EUR/USD"}
 
     all_r = {tk: r}
     prog = st.progress(0, text="Cargando datos macro...")
     for i,(mt,mn) in enumerate(macro.items()):
-        md = get_data(mt,"1y")
+        md = get_data(mt,"1y","1d")
         if len(md)>5: all_r[mn]=qrets(md)
         prog.progress((i+1)/len(macro), text=f"Cargando {mn}...")
     prog.empty()
 
-    comb = pd.DataFrame(all_r).iloc[-90:].dropna(axis=1,how="all")
+    comb = pd.DataFrame(all_r).iloc[-corr_window:].dropna(axis=1,how="all")
     corr = comb.corr()
 
     # Heatmap
@@ -918,10 +1073,16 @@ def tab4_macro(tk, df, r):
     bl = base_layout()
     bl.pop("xaxis", None); bl.pop("yaxis", None)
     fig.update_layout(**bl, height=520,
-        title=dict(text=f"Correlación 90D — {tk} vs Macro (LIVE)",font=dict(size=13,color=C["gold"])),
+        title=dict(text=f"Correlación {corr_window}D — {tk} vs Macro (LIVE)",font=dict(size=13,color=C["gold"])),
         xaxis=dict(tickfont=dict(size=10),tickangle=-45,gridcolor=C["grid"]),
         yaxis=dict(tickfont=dict(size=10),gridcolor=C["grid"]))
     st.plotly_chart(fig, use_container_width=True)
+    # Dynamic correlation diagnostic
+    n_assets_corr = len(corr.columns)
+    avg_corr = corr.values[np.triu_indices_from(corr.values, k=1)].mean() if n_assets_corr > 1 else 0
+    why_chart_diagnostic("correlation",
+        f"Matriz {n_assets_corr}×{n_assets_corr}, ρ promedio={avg_corr:.3f}. "
+        f"{'⚠️ Correlación promedio alta (>0.5): diversificación limitada, riesgo de convergencia en crisis.' if avg_corr > 0.5 else '✅ Correlación promedio moderada: portafolio con diversificación efectiva.' if avg_corr > 0.1 else '🟢 Baja correlación: excelente diversificación, activos independientes.'}")
 
     # Rolling
     st.markdown("---"); st.markdown("##### 📉 Correlación Rolling 30D")
@@ -953,7 +1114,7 @@ def tab4_macro(tk, df, r):
         if abs(vix)>.2: ins.append(f"<b>VIX:</b> ρ={vix:.3f} — {'Defensivo' if vix>0 else 'Vulnerable a vol'}")
         sol=ca.get("Sol",0)
         if abs(sol)>.1: ins.append(f"<b>PEN:</b> ρ={sol:.3f} — {'Gana con Sol débil' if sol>0 else 'Gana con Sol fuerte'}")
-    st.markdown(f'<div class="jb"><div class="lb">🤖 JARVIS — Macro Intel (90D)</div>'
+    st.markdown(f'<div class="jb"><div class="lb">🤖 JARVIS — Macro Intel ({corr_window}D)</div>'
                 f'{"<br>".join("• "+x for x in ins) if ins else "Sin datos suficientes"}</div>',unsafe_allow_html=True)
 
     # ── SENSITIVITY ANALYSIS MODULE ──
@@ -969,8 +1130,8 @@ def tab4_macro(tk, df, r):
     rows=[]
     for nm,rt in all_r.items():
         if len(rt)>5:
-            r90=rt.iloc[-min(90,len(rt)):]
-            rows.append({"Activo":nm,"Ret 90D":f"{r90.sum()*100:.2f}%","Vol 90D":f"{r90.std()*np.sqrt(252)*100:.1f}%",
+            r90=rt.iloc[-min(corr_window,len(rt)):]
+            rows.append({"Activo":nm,f"Ret {corr_window}D":f"{r90.sum()*100:.2f}%",f"Vol {corr_window}D":f"{r90.std()*np.sqrt(252)*100:.1f}%",
                          "Sharpe":f"{q_sharpe(r90):.2f}","MaxDD":f"{q_maxdd(pd.DataFrame({'Close':(1+rt).cumprod()}))*100:.1f}%"})
     if rows: st.dataframe(pd.DataFrame(rows).set_index("Activo"),use_container_width=True)
 
@@ -980,12 +1141,14 @@ def tab4_macro(tk, df, r):
 
 def main():
     ui_header(); ui_challenge()
-    tk, per = ui_sidebar()
+    tk, hz = ui_sidebar()
 
-    with st.spinner(f"📡 Descargando {tk} en tiempo real..."):
-        df = get_data(tk, per)
+    per = hz["period"]; intv = hz["interval"]; hz_label = hz["label"]
+
+    with st.spinner(f"📡 Descargando {tk} [{hz_label}] en tiempo real..."):
+        df = get_data(tk, per, intv)
         if df.empty or len(df)<5:
-            st.error(f"❌ Sin datos para **{tk}**. Verifica conexión e instalación de yfinance.")
+            st.error(f"❌ Sin datos para **{tk}** en horizonte {hz_label}. Verifica conexión.")
             st.code("pip install yfinance --upgrade", language="bash"); st.stop()
         r = qrets(df)
 
@@ -1010,8 +1173,9 @@ def main():
 
     st.markdown(f'<div class="jb" style="padding:8px 14px;margin:4px 0">'
         f'<span style="color:{C["gold"]}">●</span> <b>yfinance LIVE</b> · '
-        f'Último: <b>{df.index[-1].strftime("%Y-%m-%d")}</b> · '
-        f'Registros: <b>{len(df)}</b> · Cache: 120s</div>', unsafe_allow_html=True)
+        f'Horizonte: <b>{hz_label}</b> · '
+        f'Último: <b>{df.index[-1].strftime("%Y-%m-%d %H:%M") if intv and "m" in str(intv) else df.index[-1].strftime("%Y-%m-%d")}</b> · '
+        f'Registros: <b>{len(df)}</b> · Cache: 60s</div>', unsafe_allow_html=True)
 
     st.markdown("---")
     t1,t2,t3,t4 = st.tabs(["🌍 Radar Geopolítico","🔬 Auditoría Cuantitativa","📈 Maestro de Gráficos","🛡️ Centinela Macro"])
@@ -1021,7 +1185,7 @@ def main():
     with t4: tab4_macro(tk,df,r)
 
     st.markdown(f'<div style="text-align:center;padding:20px 0"><span style="font-family:JetBrains Mono;'
-        f'font-size:.7rem;color:{C["textm"]};letter-spacing:.1em">EATON v7.0 · {N_ASSETS} Instruments · '
+        f'font-size:.7rem;color:{C["textm"]};letter-spacing:.1em">EATON v8.0 · {N_ASSETS} Instruments · '
         f'Session {st.session_state.sid} · {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</span></div>',
         unsafe_allow_html=True)
 
