@@ -1,11 +1,7 @@
 streamlit
-
 yfinance
-
 plotly
-
 pandas
-
 scipy
-
 geopy
+streamlit-autorefresh
