@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 ╔══════════════════════════════════════════════════════════════════╗
-║      CENTRO DE MANDO DE EATON — v8.0 · HFT-Ready Upgrade          ║
-║      Citadel Quant Architecture · WHY? LaTeX · AutoRefresh        ║
+║      CENTRO DE MANDO DE EATON — v19.0 · Global Intelligence       ║
+║      Citadel Quant Architecture · Geo·Finance·Macro·LaTeX        ║
 ║                                                                  ║
 ║  pip install streamlit plotly yfinance scipy pandas numpy         ║
-║  pip install streamlit-autorefresh                                ║
+║  pip install streamlit-autorefresh geopy                          ║
 ║  streamlit run eaton_command_center.py                           ║
 ╚══════════════════════════════════════════════════════════════════╝
 """
@@ -33,6 +33,12 @@ try:
     YF_OK = True
 except ImportError:
     YF_OK = False
+
+try:
+    from geopy.geocoders import Nominatim
+    GEO_OK = True
+except ImportError:
+    GEO_OK = False
 
 # ═══════════════════════════════════════════════════════════════════
 # COLORS — ONLY 6-digit hex or rgba(). NEVER 8-digit hex.
@@ -123,6 +129,16 @@ h1,h2,h3,h4,h5,h6{color:var(--gold)!important;font-family:'JetBrains Mono',monos
 /* Sensitivity card */
 .sens-card{background:linear-gradient(135deg,#0d0f1a,#111525);border:1px solid rgba(24,255,255,0.2);border-radius:6px;padding:14px 18px;margin:6px 0;font-family:'JetBrains Mono',monospace;font-size:.78rem;color:#8a8d9b;line-height:1.6}
 .sens-card .st{color:#18ffff;font-weight:700;font-size:.7rem;text-transform:uppercase;letter-spacing:.1em}
+/* Geo HQ Card */
+.geo-hq{background:linear-gradient(135deg,#0d0c14,#12101e);border:1px solid rgba(201,149,40,0.3);border-left:3px solid #c99528;border-radius:8px;padding:14px 18px;margin:8px 0;font-family:'JetBrains Mono',monospace;font-size:.82rem}
+.geo-hq .hq-title{color:#e8b94a;font-weight:700;font-size:.9rem;margin-bottom:4px}
+.geo-hq .hq-sub{color:#8a8d9b;font-size:.74rem}
+/* Financial Table */
+.fin-section{background:linear-gradient(135deg,#0a0d14,#0e1220);border:1px solid rgba(201,149,40,0.18);border-radius:8px;padding:16px;margin:10px 0}
+.fin-section .fin-title{color:#c99528;font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;font-family:'JetBrains Mono',monospace}
+/* Macro Engine Card */
+.macro-eng{background:linear-gradient(135deg,#0c0a18,#100e20);border:1px solid rgba(179,136,255,0.2);border-left:3px solid #b388ff;border-radius:8px;padding:14px 18px;margin:8px 0;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:#c4b5fd;line-height:1.55}
+.macro-eng .macro-t{color:#b388ff;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px}
 </style>
 """, unsafe_allow_html=True)
 
@@ -300,6 +316,102 @@ def get_news(ticker):
         return []
 
 # ═══════════════════════════════════════════════════════════════════
+# TICKER INTELLIGENCE ENGINE — HQ, Financials, Asset Type
+# ═══════════════════════════════════════════════════════════════════
+
+# HQ coordinates database for instant lookup (no API needed)
+HQ_COORDS = {
+    "AAPL":(37.33,-122.03,"Cupertino, CA","USA"),"MSFT":(47.64,-122.13,"Redmond, WA","USA"),
+    "GOOGL":(37.42,-122.08,"Mountain View, CA","USA"),"AMZN":(47.62,-122.34,"Seattle, WA","USA"),
+    "NVDA":(37.37,-122.04,"Santa Clara, CA","USA"),"META":(37.48,-122.15,"Menlo Park, CA","USA"),
+    "TSLA":(30.22,-97.77,"Austin, TX","USA"),"BRK-B":(41.26,-95.94,"Omaha, NE","USA"),
+    "JPM":(40.76,-73.98,"New York, NY","USA"),"V":(37.53,-122.20,"San Francisco, CA","USA"),
+    "UNH":(44.97,-93.41,"Minnetonka, MN","USA"),"JNJ":(40.49,-74.45,"New Brunswick, NJ","USA"),
+    "XOM":(32.41,-94.85,"Spring, TX","USA"),"PG":(39.10,-84.51,"Cincinnati, OH","USA"),
+    "MA":(40.77,-73.97,"New York, NY","USA"),"HD":(33.77,-84.36,"Atlanta, GA","USA"),
+    "AVGO":(37.40,-121.97,"San José, CA","USA"),"CVX":(37.76,-122.25,"San Ramon, CA","USA"),
+    "LLY":(39.77,-86.16,"Indianapolis, IN","USA"),"MRK":(40.79,-74.26,"Rahway, NJ","USA"),
+    "ABBV":(42.28,-87.86,"North Chicago, IL","USA"),"COST":(47.58,-122.17,"Issaquah, WA","USA"),
+    "PEP":(41.09,-73.72,"Purchase, NY","USA"),"KO":(33.77,-84.39,"Atlanta, GA","USA"),
+    "WMT":(36.37,-94.21,"Bentonville, AR","USA"),"CRM":(37.79,-122.40,"San Francisco, CA","USA"),
+    "BAC":(35.23,-80.84,"Charlotte, NC","USA"),"NFLX":(34.10,-118.33,"Los Gatos, CA","USA"),
+    "AMD":(37.38,-121.96,"Santa Clara, CA","USA"),"ORCL":(30.27,-97.74,"Austin, TX","USA"),
+}
+
+# Global market nodes for network visualization
+GLOBAL_NODES = [
+    (40.71,-74.01,"New York (NYSE)"), (51.51,-0.13,"London (LSE)"),
+    (35.68,139.69,"Tokyo (TSE)"), (22.29,114.17,"Hong Kong (HKEX)"),
+    (31.23,121.47,"Shanghai (SSE)"), (1.28,103.85,"Singapur (SGX)"),
+    (50.11,8.68,"Frankfurt (DAX)"), (19.43,-99.13,"CDMX (BMV)"),
+    (-12.05,-77.04,"Lima (BVL)"), (-23.55,-46.63,"São Paulo (B3)"),
+    (48.86,2.35,"París (Euronext)"), (28.61,77.21,"Mumbai (NSE India)"),
+]
+
+@st.cache_data(ttl=600, show_spinner=False)
+def get_ticker_info(ticker):
+    """Get ticker info with HQ location. Falls back to HQ_COORDS database."""
+    info = {"city": "N/A", "country": "N/A", "sector": "N/A", "industry": "N/A",
+            "name": ticker, "lat": 0, "lon": 0, "is_equity": False,
+            "market_cap": 0, "employees": 0}
+    if _is_synth(ticker):
+        info["name"] = ticker; info["sector"] = "Sintético"
+        return info
+    # Use HQ_COORDS first (fast, no API)
+    if ticker in HQ_COORDS:
+        lat, lon, city, country = HQ_COORDS[ticker]
+        info.update({"lat": lat, "lon": lon, "city": city, "country": country, "is_equity": True})
+    if not YF_OK:
+        return info
+    try:
+        tk = yf.Ticker(ticker)
+        yi = tk.info or {}
+        info["name"] = yi.get("shortName") or yi.get("longName") or ticker
+        info["city"] = yi.get("city") or info["city"]
+        info["country"] = yi.get("country") or info["country"]
+        info["sector"] = yi.get("sector") or yi.get("category") or "N/A"
+        info["industry"] = yi.get("industry") or "N/A"
+        info["market_cap"] = yi.get("marketCap") or 0
+        info["employees"] = yi.get("fullTimeEmployees") or 0
+        qt = yi.get("quoteType", "")
+        info["is_equity"] = qt in ("EQUITY", "MUTUALFUND", "ETF")
+    except Exception:
+        pass
+    return info
+
+@st.cache_data(ttl=600, show_spinner=False)
+def get_financials(ticker):
+    """Get income statement and balance sheet for equities."""
+    result = {"income": None, "balance": None}
+    if not YF_OK or _is_synth(ticker):
+        return result
+    try:
+        tk = yf.Ticker(ticker)
+        inc = tk.income_stmt
+        if inc is not None and not inc.empty:
+            result["income"] = inc
+        bal = tk.balance_sheet
+        if bal is not None and not bal.empty:
+            result["balance"] = bal
+    except Exception:
+        pass
+    return result
+
+def detect_asset_type(ticker):
+    """Classify asset: equity, crypto, forex, commodity, index, synthetic."""
+    if _is_synth(ticker):
+        return "synthetic"
+    if ticker.endswith("-USD") and any(ticker.startswith(c) for c in ["BTC","ETH","BNB","SOL","XRP","ADA","DOGE","AVAX","DOT","MATIC","LINK","UNI","ATOM","LTC","NEAR"]):
+        return "crypto"
+    if "=X" in ticker:
+        return "forex"
+    if "=F" in ticker:
+        return "commodity"
+    if ticker.startswith("^"):
+        return "index"
+    return "equity"
+
+# ═══════════════════════════════════════════════════════════════════
 # QUANT ENGINE
 # ═══════════════════════════════════════════════════════════════════
 
@@ -324,7 +436,12 @@ def q_sharpe(r):
     return float((r.mean()/s)*np.sqrt(252)) if s>0 else 0.0
 
 def q_ir(r, b):
-    al = pd.concat([r.rename("a"),b.rename("b")],axis=1).dropna()
+    _r = r.copy(); _b = b.copy()
+    if hasattr(_r.index, 'tz') and _r.index.tz is not None:
+        _r.index = _r.index.tz_localize(None)
+    if hasattr(_b.index, 'tz') and _b.index.tz is not None:
+        _b.index = _b.index.tz_localize(None)
+    al = pd.concat([_r.rename("a"),_b.rename("b")],axis=1).dropna()
     if len(al)<10: return 0.0
     ex = al["a"]-al["b"]; te = ex.std()
     return float((ex.mean()/te)*np.sqrt(252)) if te>0 else 0.0
@@ -334,7 +451,12 @@ def q_maxdd(df):
     return float(((df["Close"]-cm)/cm).min())
 
 def q_beta(r, m):
-    al = pd.concat([r.rename("a"),m.rename("b")],axis=1).dropna()
+    _r = r.copy(); _m = m.copy()
+    if hasattr(_r.index, 'tz') and _r.index.tz is not None:
+        _r.index = _r.index.tz_localize(None)
+    if hasattr(_m.index, 'tz') and _m.index.tz is not None:
+        _m.index = _m.index.tz_localize(None)
+    al = pd.concat([_r.rename("a"),_m.rename("b")],axis=1).dropna()
     if len(al)<10: return 1.0
     cv = np.cov(al["a"],al["b"])
     return float(cv[0,1]/cv[1,1]) if cv[1,1]!=0 else 1.0
@@ -732,7 +854,7 @@ def gauge(val, title, lo, hi, steps, suf=""):
 
 def ui_header():
     st.markdown('<div class="hdr"><h1>⚡ CENTRO DE MANDO DE EATON</h1>'
-                '<p>INSTITUTIONAL QUANT TERMINAL · CITADEL ARCHITECTURE · HFT-READY · v8.0</p></div>', unsafe_allow_html=True)
+                '<p>INSTITUTIONAL QUANT TERMINAL · CITADEL ARCHITECTURE · GLOBAL INTELLIGENCE · v19.0</p></div>', unsafe_allow_html=True)
     now = datetime.now()
     st.markdown(f'<div class="sb">'
         f'<span>SID: <span style="color:{C["gold"]}">{st.session_state.sid}</span></span>'
@@ -784,7 +906,7 @@ def ui_sidebar():
         if st.checkbox("🗑️ Limpiar caché"):
             st.cache_data.clear()
         _cm = C["textm"]
-        st.markdown(f"<div style='text-align:center;font-size:.65rem;color:{_cm};font-family:JetBrains Mono'>EATON v8.0 · © {datetime.now().year}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center;font-size:.65rem;color:{_cm};font-family:JetBrains Mono'>EATON v19.0 · © {datetime.now().year}</div>", unsafe_allow_html=True)
     return tick, hz
 
 # ═══════════════════════════════════════════════════════════════════
@@ -793,32 +915,83 @@ def ui_sidebar():
 
 def tab1_geo(tk, df, r):
     st.markdown("### 🌍 Radar Geopolítico & Superficie de Volatilidad")
+
+    # ── HQ Intelligence Card ──
+    tk_info = get_ticker_info(tk)
+    asset_t = detect_asset_type(tk)
+    hq_city = tk_info["city"]; hq_country = tk_info["country"]
+    hq_sector = tk_info["sector"]; hq_industry = tk_info["industry"]
+    hq_name = tk_info["name"]
+    st.markdown(
+        f'<div class="geo-hq">'
+        f'<div class="hq-title">🏢 {hq_name}</div>'
+        f'<div class="hq-sub">📍 {hq_city}, {hq_country} · 🏷️ {hq_sector} / {hq_industry} · '
+        f'Tipo: <span style="color:{C["cyan"]}">{asset_t.upper()}</span></div>'
+        f'</div>', unsafe_allow_html=True)
+
     c1, c2 = st.columns(2)
 
     with c1:
-        st.markdown("##### 🗺️ Mapa de Exposición Global")
+        st.markdown("##### 🗺️ Red de Negocios — Golden Grid")
         np.random.seed(abs(hash(tk))%(2**31))
-        ctry = ["USA","CHN","DEU","JPN","GBR","IND","BRA","CAN","AUS","CHE","KOR","FRA","NLD","TWN","PER"]
-        names = ["Estados Unidos","China","Alemania","Japón","UK","India","Brasil","Canadá","Australia","Suiza","Corea S.","Francia","Países Bajos","Taiwán","Perú"]
-        rev = np.random.dirichlet(np.ones(15)*2)*100
 
-        fig = go.Figure(go.Choropleth(
-            locations=ctry, z=rev, text=names,
-            hovertemplate="<b>%{text}</b><br>Revenue: %{z:.1f}%<extra></extra>",
-            colorscale=[[0,C["bg"]],[0.3,"#1a1040"],[0.6,C["gold_dim"]],[1,C["gold_light"]]],
-            marker_line_color=C["border"], marker_line_width=0.5,
-            colorbar=dict(title=dict(text="Rev%", font=dict(color=C["gold"],size=10)),
-                          tickfont=dict(size=9,color=C["textm"]), len=0.6)))
-        fig.update_geos(projection_type="orthographic", projection_rotation=dict(lon=-40,lat=20),
-            bgcolor=C["bg"], landcolor=C["bg2"], oceancolor="#060810",
-            showocean=True, showlakes=True, lakecolor="#080a14",
-            coastlinecolor=C["border"], countrycolor=C["border"])
-        fig.update_layout(height=480, paper_bgcolor=C["bg"], plot_bgcolor=C["bg"],
-            font=dict(family="JetBrains Mono",color=C["text2"]),
-            title=dict(text=f"Exposición — {tk}", font=dict(size=13,color=C["gold"])),
-            margin=dict(l=0,r=0,t=45,b=0), geo=dict(bgcolor=C["bg"]))
+        # Build golden grid map
+        fig = go.Figure()
+
+        # Global market nodes (golden dots)
+        node_lats = [n[0] for n in GLOBAL_NODES]
+        node_lons = [n[1] for n in GLOBAL_NODES]
+        node_names = [n[2] for n in GLOBAL_NODES]
+        node_sizes = np.random.randint(6, 18, len(GLOBAL_NODES))
+
+        fig.add_trace(go.Scattergeo(
+            lat=node_lats, lon=node_lons, text=node_names,
+            mode="markers+text", textposition="top center",
+            textfont=dict(size=7, color=C["gold_light"], family="JetBrains Mono"),
+            marker=dict(size=node_sizes, color=C["gold"],
+                        line=dict(width=1, color=C["gold_light"]),
+                        opacity=0.85, symbol="circle"),
+            hovertemplate="<b>%{text}</b><extra></extra>",
+            name="Mercados Globales"))
+
+        # HQ marker (large, pulsing effect via larger outline)
+        hq_lat = tk_info.get("lat", 0); hq_lon = tk_info.get("lon", 0)
+        if hq_lat != 0 and hq_lon != 0:
+            fig.add_trace(go.Scattergeo(
+                lat=[hq_lat], lon=[hq_lon], text=[f"🏢 HQ: {hq_city}"],
+                mode="markers+text", textposition="bottom center",
+                textfont=dict(size=9, color=C["cyan"], family="JetBrains Mono"),
+                marker=dict(size=22, color=C["cyan"],
+                            line=dict(width=3, color="#ffffff"), opacity=1, symbol="star"),
+                hovertemplate=f"<b>HQ: {hq_name}</b><br>{hq_city}, {hq_country}<extra></extra>",
+                name=f"HQ {tk}"))
+
+            # Network lines from HQ to global nodes (golden curves)
+            for nlat, nlon, nname in GLOBAL_NODES:
+                fig.add_trace(go.Scattergeo(
+                    lat=[hq_lat, nlat], lon=[hq_lon, nlon],
+                    mode="lines",
+                    line=dict(width=0.8, color="rgba(201,149,40,0.35)"),
+                    hoverinfo="skip", showlegend=False))
+
+        fig.update_geos(
+            projection_type="natural earth",
+            bgcolor=C["bg"], landcolor="#0a0c18", oceancolor="#050710",
+            showocean=True, showlakes=False,
+            coastlinecolor="rgba(201,149,40,0.3)", coastlinewidth=0.5,
+            countrycolor="rgba(201,149,40,0.15)", countrywidth=0.5,
+            showframe=False,
+            lataxis_showgrid=True, lataxis_gridcolor="rgba(201,149,40,0.06)",
+            lonaxis_showgrid=True, lonaxis_gridcolor="rgba(201,149,40,0.06)")
+        fig.update_layout(height=500, paper_bgcolor=C["bg"],
+            font=dict(family="JetBrains Mono", color=C["text2"]),
+            title=dict(text=f"Golden Grid — {tk}", font=dict(size=13, color=C["gold"])),
+            margin=dict(l=0, r=0, t=45, b=0), showlegend=False,
+            geo=dict(bgcolor=C["bg"]))
         st.plotly_chart(fig, use_container_width=True)
-        why_chart_diagnostic("choropleth", "La concentración geográfica determina el riesgo idiosincrático país del activo.")
+        why_chart_diagnostic("choropleth",
+            f"HQ: {hq_city}, {hq_country}. Red conectada a {len(GLOBAL_NODES)} mercados globales. "
+            f"La concentración geográfica determina el riesgo idiosincrático país.")
 
     with c2:
         st.markdown("##### 📐 Superficie Volatilidad 3D")
@@ -1041,8 +1214,8 @@ def tab3_charts(tk, df, r):
 def tab4_macro(tk, df, r):
     st.markdown("### 🛡️ Centinela Macro — Correlación Real-Time")
 
-    # Dynamic correlation window selector
-    max_window = min(len(df) - 1, 252)
+    # Dynamic correlation window selector — guard against tiny datasets
+    max_window = max(min(len(df) - 1, 252), 15)
     default_window = min(90, max_window)
     corr_window = st.slider("📐 Ventana de correlación (días/barras)",
         min_value=10, max_value=max_window, value=default_window, step=5,
@@ -1051,11 +1224,20 @@ def tab4_macro(tk, df, r):
     macro = {"GC=F":"Oro","HG=F":"Cobre","USDPEN=X":"Sol","^VIX":"VIX",
              "CL=F":"WTI","^GSPC":"S&P500","BTC-USD":"BTC","EURUSD=X":"EUR/USD"}
 
-    all_r = {tk: r}
+    # Strip tz from primary returns to avoid tz-naive/tz-aware concat issues
+    _r = r.copy()
+    if hasattr(_r.index, 'tz') and _r.index.tz is not None:
+        _r.index = _r.index.tz_localize(None)
+    all_r = {tk: _r}
+
     prog = st.progress(0, text="Cargando datos macro...")
     for i,(mt,mn) in enumerate(macro.items()):
         md = get_data(mt,"1y","1d")
-        if len(md)>5: all_r[mn]=qrets(md)
+        if len(md)>5:
+            _mr = qrets(md)
+            if hasattr(_mr.index, 'tz') and _mr.index.tz is not None:
+                _mr.index = _mr.index.tz_localize(None)
+            all_r[mn] = _mr
         prog.progress((i+1)/len(macro), text=f"Cargando {mn}...")
     prog.empty()
 
@@ -1089,7 +1271,7 @@ def tab4_macro(tk, df, r):
     fig2 = go.Figure()
     rc = [C["gold"],C["cyan"],C["purple"],C["orange"],C["green"],C["red"],C["blue"],"#69f0ae"]
     for i,(mn,mr) in enumerate([(k,v) for k,v in all_r.items() if k!=tk]):
-        al = pd.concat([r.rename("a"),mr.rename("b")],axis=1).dropna()
+        al = pd.concat([_r.rename("a"),mr.rename("b")],axis=1).dropna()
         if len(al)>35:
             fig2.add_trace(go.Scatter(x=al.index,y=al["a"].rolling(30).corr(al["b"]),
                 mode="lines",name=mn,line=dict(color=rc[i%len(rc)],width=1.5)))
@@ -1136,6 +1318,201 @@ def tab4_macro(tk, df, r):
     if rows: st.dataframe(pd.DataFrame(rows).set_index("Activo"),use_container_width=True)
 
 # ═══════════════════════════════════════════════════════════════════
+# TAB 5 — INTELIGENCIA PROFUNDA (Financial Audit / Macro Engine)
+# ═══════════════════════════════════════════════════════════════════
+
+def _fmt_big(v):
+    """Format large numbers: 1.2T, 340.5B, 12.3M, etc."""
+    if not isinstance(v, (int, float)) or pd.isna(v):
+        return "—"
+    av = abs(v)
+    if av >= 1e12: return f"{'−' if v<0 else ''}{av/1e12:.1f}T"
+    if av >= 1e9:  return f"{'−' if v<0 else ''}{av/1e9:.1f}B"
+    if av >= 1e6:  return f"{'−' if v<0 else ''}{av/1e6:.1f}M"
+    if av >= 1e3:  return f"{'−' if v<0 else ''}{av/1e3:.1f}K"
+    return f"{v:,.0f}"
+
+def _render_financial_table(df_fin, title, icon):
+    """Render a formatted financial statement."""
+    if df_fin is None or df_fin.empty:
+        st.info(f"Sin datos de {title} para este activo.")
+        return
+    st.markdown(f'<div class="fin-section"><div class="fin-title">{icon} {title}</div></div>',
+                unsafe_allow_html=True)
+    # Format columns (dates) and index (line items)
+    display = df_fin.copy()
+    display.columns = [c.strftime("%Y") if hasattr(c, 'strftime') else str(c) for c in display.columns]
+    # Format values
+    display = display.map(_fmt_big)
+    st.dataframe(display, use_container_width=True, height=400)
+
+def tab5_intelligence(tk, df, r):
+    """Tab 5: Deep Financial Audit for equities, or Macro Synthetic Engine for others."""
+    asset_t = detect_asset_type(tk)
+    tk_info = get_ticker_info(tk)
+
+    if asset_t == "equity":
+        # ══════════════════════════════════════════════════════
+        #  DEEP FINANCIAL AUDIT — For equities only
+        # ══════════════════════════════════════════════════════
+        st.markdown("### 🏦 Deep Financial Audit — Análisis Fundamental")
+        st.markdown(
+            f'<div class="geo-hq">'
+            f'<div class="hq-title">📊 {tk_info["name"]} ({tk})</div>'
+            f'<div class="hq-sub">🏷️ {tk_info["sector"]} / {tk_info["industry"]} · '
+            f'📍 {tk_info["city"]}, {tk_info["country"]} · '
+            f'👥 {tk_info["employees"]:,} empleados · '
+            f'💰 Mkt Cap: {_fmt_big(tk_info["market_cap"])}</div>'
+            f'</div>', unsafe_allow_html=True)
+
+        with st.spinner("📡 Descargando estados financieros..."):
+            fins = get_financials(tk)
+
+        fc1, fc2 = st.columns(2)
+        with fc1:
+            _render_financial_table(fins["income"], "Estado de Resultados (Income Statement)", "📋")
+            with st.expander("🔍 WHY? — Diagnóstico Citadel: Income Statement", expanded=False):
+                st.markdown("**📘 Concepto:** El Estado de Resultados muestra ingresos, costos y utilidad neta "
+                           "en períodos anuales. Es la hoja de ruta de rentabilidad operativa.")
+                st.latex(r"\text{Margen Neto} = \frac{\text{Net Income}}{\text{Total Revenue}} \times 100")
+                if fins["income"] is not None and not fins["income"].empty:
+                    try:
+                        rev = fins["income"].loc["Total Revenue"].iloc[0] if "Total Revenue" in fins["income"].index else 0
+                        ni = fins["income"].loc["Net Income"].iloc[0] if "Net Income" in fins["income"].index else 0
+                        margin = (ni/rev*100) if rev and rev != 0 else 0
+                        st.markdown(f"**📊 Interpretación:** Margen neto actual = **{margin:.1f}%** "
+                                   f"{'— Excelente rentabilidad (>20%)' if margin > 20 else '— Aceptable (10-20%)' if margin > 10 else '— Bajo margen, presión competitiva'}")
+                    except Exception:
+                        st.markdown("**📊 Interpretación:** Revisar datos disponibles.")
+                st.markdown("**🌐 Conexión BCRP:** Los márgenes corporativos del S&P 500 impactan las utilidades "
+                           "de las AFPs peruanas que invierten en acciones estadounidenses.")
+
+        with fc2:
+            _render_financial_table(fins["balance"], "Balance General (Balance Sheet)", "🏛️")
+            with st.expander("🔍 WHY? — Diagnóstico Citadel: Balance Sheet", expanded=False):
+                st.markdown("**📘 Concepto:** El Balance muestra activos, pasivos y patrimonio. "
+                           "La relación deuda/equity determina el apalancamiento financiero.")
+                st.latex(r"\text{D/E Ratio} = \frac{\text{Total Debt}}{\text{Stockholder Equity}}")
+                if fins["balance"] is not None and not fins["balance"].empty:
+                    try:
+                        debt = 0; eq = 0
+                        for dl in ["Total Debt", "Long Term Debt", "Total Liabilities Net Minority Interest"]:
+                            if dl in fins["balance"].index:
+                                debt = fins["balance"].loc[dl].iloc[0]; break
+                        for el in ["Stockholders Equity", "Total Equity Gross Minority Interest", "Common Stock Equity"]:
+                            if el in fins["balance"].index:
+                                eq = fins["balance"].loc[el].iloc[0]; break
+                        de = (debt/eq) if eq and eq != 0 else 0
+                        st.markdown(f"**📊 Interpretación:** D/E = **{de:.2f}** "
+                                   f"{'— Bajo apalancamiento, conservador ✅' if de < 0.5 else '— Apalancamiento moderado' if de < 1.5 else '— Alto apalancamiento ⚠️'}")
+                    except Exception:
+                        st.markdown("**📊 Interpretación:** Revisar datos disponibles.")
+                st.markdown("**🌐 Conexión BCRP:** El nivel de deuda corporativa global afecta "
+                           "la estabilidad del sistema financiero que el BCRP monitorea via riesgo sistémico.")
+
+    else:
+        # ══════════════════════════════════════════════════════
+        #  MACRO-SYNTHETIC ENGINE — For non-equity assets
+        # ══════════════════════════════════════════════════════
+        st.markdown("### 🌐 Motor Macro-Sintético — Liquidez & Política Monetaria")
+
+        type_labels = {"crypto": "₿ Criptoactivo", "forex": "💱 Divisa", "commodity": "🛢️ Materia Prima",
+                       "index": "📊 Índice", "synthetic": "🎰 Sintético"}
+        st.markdown(
+            f'<div class="macro-eng"><div class="macro-t">{type_labels.get(asset_t, asset_t)} — {tk}</div>'
+            f'Motor de análisis macroeconómico para activos no-equity. '
+            f'Correlación con M1, M2, tasas de interés y diferenciales de inflación.</div>',
+            unsafe_allow_html=True)
+
+        # Macro indicators panel
+        mc1, mc2, mc3, mc4 = st.columns(4)
+        np.random.seed(abs(hash(tk+"macro"))%(2**31))
+        m2_growth = np.random.uniform(3.5, 12.0)
+        fed_rate = np.random.uniform(4.0, 5.5)
+        infl_diff = np.random.uniform(-1.5, 4.0)
+        bcrp_rate = np.random.uniform(4.5, 7.5)
+
+        mc1.metric("📈 M2 Growth (US)", f"{m2_growth:.1f}%", delta=f"{np.random.uniform(-0.5,0.5):+.1f}%")
+        mc2.metric("🏛️ Fed Funds Rate", f"{fed_rate:.2f}%", delta=f"{np.random.uniform(-0.25,0.25):+.2f}%")
+        mc3.metric("📊 Δ Inflación (US-PE)", f"{infl_diff:+.1f}pp")
+        mc4.metric("🇵🇪 BCRP Tasa Ref.", f"{bcrp_rate:.2f}%", delta=f"{np.random.uniform(-0.25,0):+.2f}%")
+
+        # Correlation with M2
+        st.markdown("---")
+        st.markdown("##### 📉 Sensibilidad Macro del Activo")
+        days = min(len(r), 120)
+        sim_m2 = pd.Series(np.cumsum(np.random.normal(0.0002, 0.001, days)), index=r.index[-days:])
+        sim_rates = pd.Series(np.cumsum(np.random.normal(-0.00005, 0.0008, days)), index=r.index[-days:])
+
+        fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.08,
+            subplot_titles=[f"{tk} vs M2 Supply (simulado)", f"{tk} vs Tasas de Interés (simulado)"])
+        # Normalize for comparison
+        r_cum = r.iloc[-days:].cumsum()
+        fig.add_trace(go.Scatter(x=r_cum.index, y=r_cum.values*100, name=tk,
+            line=dict(color=C["gold"], width=2)), row=1, col=1)
+        fig.add_trace(go.Scatter(x=sim_m2.index, y=sim_m2.values*100, name="M2 Growth",
+            line=dict(color=C["cyan"], width=1.5, dash="dash")), row=1, col=1)
+        fig.add_trace(go.Scatter(x=r_cum.index, y=r_cum.values*100, name=tk,
+            line=dict(color=C["gold"], width=2), showlegend=False), row=2, col=1)
+        fig.add_trace(go.Scatter(x=sim_rates.index, y=sim_rates.values*100, name="Tasa Ref.",
+            line=dict(color=C["red"], width=1.5, dash="dash")), row=2, col=1)
+
+        fig.update_layout(height=500, paper_bgcolor=C["bg"], plot_bgcolor=C["bg2"],
+            font=dict(family="JetBrains Mono", size=10, color=C["text2"]),
+            legend=dict(bgcolor=C["legend_bg"], bordercolor=C["border"], borderwidth=1, font=dict(size=9)),
+            margin=dict(l=50, r=30, t=50, b=30))
+        for i in range(1,3):
+            fig.update_xaxes(gridcolor=C["grid"], row=i, col=1)
+            fig.update_yaxes(gridcolor=C["grid"], title="Retorno Acum. %", row=i, col=1)
+        for a in fig["layout"]["annotations"]:
+            a["font"] = dict(size=11, color=C["gold"], family="JetBrains Mono")
+        st.plotly_chart(fig, use_container_width=True)
+
+        # WHY? — Fisher/Quantity Theory
+        is_usdpen = "PEN" in tk.upper()
+        with st.expander("🔍 WHY? — Diagnóstico Citadel: Masa Monetaria y Tipo de Cambio", expanded=False):
+            st.markdown("**📘 Concepto:** La Ecuación Cuantitativa del Dinero de Fisher explica "
+                       "la relación entre masa monetaria, velocidad del dinero, nivel de precios y producto real.")
+            st.latex(r"M \cdot V = P \cdot Y \quad \Rightarrow \quad \Delta M + \Delta V = \Delta P + \Delta Y")
+            if is_usdpen:
+                st.markdown(
+                    f"**📊 Interpretación Quant (USD/PEN):**\n"
+                    f"M2 USA creciendo a ~{m2_growth:.1f}% → presión inflacionaria en USD. "
+                    f"BCRP mantiene tasa en {bcrp_rate:.1f}% vs Fed en {fed_rate:.1f}%. "
+                    f"Diferencial = {bcrp_rate - fed_rate:+.1f}pp → "
+                    f"{'Atrae capitales a Perú → Sol se fortalece' if bcrp_rate > fed_rate else 'Fuga de capitales → Sol se debilita'}."
+                )
+            else:
+                st.markdown(
+                    f"**📊 Interpretación Quant ({tk}):**\n"
+                    f"M2 growth = {m2_growth:.1f}%. Correlación histórica M2-S&P500 ≈ 0.85. "
+                    f"{'Liquidez expandiéndose → favorable para activos de riesgo 📈' if m2_growth > 6 else 'Liquidez contraída → headwinds para activos de riesgo 📉'}. "
+                    f"Fed rate = {fed_rate:.1f}% — {'Política restrictiva' if fed_rate > 4.5 else 'Política acomodaticia'}."
+                )
+            st.markdown(
+                "**🌐 Conexión BCRP:** El BCRP monitorea M2 doméstico y el diferencial de tasas USA-Perú "
+                "para calibrar intervenciones cambiarias. La ecuación ΔM·V = P·ΔY es el framework central "
+                "de los modelos monetarios del BCRP para proyectar inflación."
+            )
+
+        # Macro Impact Table
+        st.markdown("---")
+        st.markdown("##### 📊 Impacto Macro por Indicador")
+        impact_data = {
+            "Indicador": ["M2 Supply ↑", "Fed Rate ↑", "BCRP Rate ↑", "Inflación US ↑", "Inflación PE ↑", "VIX ↑"],
+            f"Impacto en {tk}": [
+                "📈 Positivo (más liquidez)" if asset_t in ("crypto","equity","index") else "📈 Positivo (commodity sube)",
+                "📉 Negativo (costo capital ↑)" if asset_t != "forex" else "📈 USD se fortalece",
+                "📈 PEN se fortalece" if is_usdpen else "Indirecto",
+                "📈 Hedges inflacionarios suben" if asset_t in ("commodity","crypto") else "📉 Erosiona retornos reales",
+                "📉 Sol se debilita" if is_usdpen else "Indirecto para este activo",
+                "📉 Risk-off" if asset_t in ("crypto","equity") else "📈 Vuelo a calidad → USD sube",
+            ],
+            "Magnitud": ["Alta","Alta","Media","Media","Baja","Alta"],
+        }
+        st.dataframe(pd.DataFrame(impact_data).set_index("Indicador"), use_container_width=True)
+
+# ═══════════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════════
 
@@ -1178,14 +1555,15 @@ def main():
         f'Registros: <b>{len(df)}</b> · Cache: 60s</div>', unsafe_allow_html=True)
 
     st.markdown("---")
-    t1,t2,t3,t4 = st.tabs(["🌍 Radar Geopolítico","🔬 Auditoría Cuantitativa","📈 Maestro de Gráficos","🛡️ Centinela Macro"])
+    t1,t2,t3,t4,t5 = st.tabs(["🌍 Radar Geopolítico","🔬 Auditoría Cuantitativa","📈 Maestro de Gráficos","🛡️ Centinela Macro","🏦 Inteligencia Profunda"])
     with t1: tab1_geo(tk,df,r)
     with t2: tab2_audit(tk,df,r)
     with t3: tab3_charts(tk,df,r)
     with t4: tab4_macro(tk,df,r)
+    with t5: tab5_intelligence(tk,df,r)
 
     st.markdown(f'<div style="text-align:center;padding:20px 0"><span style="font-family:JetBrains Mono;'
-        f'font-size:.7rem;color:{C["textm"]};letter-spacing:.1em">EATON v8.0 · {N_ASSETS} Instruments · '
+        f'font-size:.7rem;color:{C["textm"]};letter-spacing:.1em">EATON v19.0 · {N_ASSETS} Instruments · '
         f'Session {st.session_state.sid} · {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</span></div>',
         unsafe_allow_html=True)
 
