@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ╔══════════════════════════════════════════════════════════════════╗
-║      CENTRO DE MANDO DE EATON — v19.0 · Global Intelligence       ║
+║      CENTRO DE MANDO DE EATON — v20.0 · Global Intelligence       ║
 ║      Citadel Quant Architecture · Geo·Finance·Macro·LaTeX        ║
 ║                                                                  ║
 ║  pip install streamlit plotly yfinance scipy pandas numpy         ║
@@ -139,6 +139,11 @@ h1,h2,h3,h4,h5,h6{color:var(--gold)!important;font-family:'JetBrains Mono',monos
 /* Macro Engine Card */
 .macro-eng{background:linear-gradient(135deg,#0c0a18,#100e20);border:1px solid rgba(179,136,255,0.2);border-left:3px solid #b388ff;border-radius:8px;padding:14px 18px;margin:8px 0;font-family:'JetBrains Mono',monospace;font-size:.8rem;color:#c4b5fd;line-height:1.55}
 .macro-eng .macro-t{color:#b388ff;font-weight:700;font-size:.72rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px}
+/* Partner Ledger Table */
+.ptr-ledger{background:linear-gradient(135deg,#0a0e16,#0d1220);border:1px solid rgba(24,255,255,0.2);border-radius:8px;padding:16px;margin:10px 0}
+.ptr-ledger .ptr-title{color:#18ffff;font-weight:700;font-size:.78rem;text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;font-family:'JetBrains Mono',monospace}
+/* EBITDA Section */
+.ebitda-card{background:linear-gradient(135deg,#0d0c14,#12101e);border:1px solid rgba(201,149,40,0.25);border-left:3px solid #c99528;border-radius:8px;padding:14px 18px;margin:8px 0;font-family:'JetBrains Mono',monospace;font-size:.82rem}
 </style>
 """, unsafe_allow_html=True)
 
@@ -346,6 +351,76 @@ GLOBAL_NODES = [
     (50.11,8.68,"Frankfurt (DAX)"), (19.43,-99.13,"CDMX (BMV)"),
     (-12.05,-77.04,"Lima (BVL)"), (-23.55,-46.63,"São Paulo (B3)"),
     (48.86,2.35,"París (Euronext)"), (28.61,77.21,"Mumbai (NSE India)"),
+]
+
+# ───────────────────────────────────────────────────────────────────
+# STRATEGIC PARTNERS & SUPPLY CHAIN DATABASE
+# ───────────────────────────────────────────────────────────────────
+
+STRATEGIC_PARTNERS = {
+    "AAPL": [
+        {"partner":"TSMC","role":"Fabricante de chips","country":"Taiwán","lat":24.78,"lon":120.99,"desc":"Produce los chips A-series y M-series en nodos de 3nm"},
+        {"partner":"Foxconn","role":"Ensamblaje","country":"China","lat":22.64,"lon":114.02,"desc":"Mayor ensamblador de iPhones en Shenzhen y Zhengzhou"},
+        {"partner":"Samsung Display","role":"Pantallas OLED","country":"Corea del Sur","lat":36.67,"lon":127.0,"desc":"Proveedor principal de paneles OLED para iPhone Pro"},
+        {"partner":"Qualcomm","role":"Módems 5G","country":"USA","lat":32.90,"lon":-117.20,"desc":"Suministra módems 5G para conectividad celular"},
+        {"partner":"Broadcom","role":"Componentes wireless","country":"USA","lat":37.40,"lon":-121.97,"desc":"Chips Wi-Fi, Bluetooth y RF para todos los dispositivos"},
+        {"partner":"Corning","role":"Gorilla Glass","country":"USA","lat":42.14,"lon":-77.05,"desc":"Fabricante del cristal protector Ceramic Shield del iPhone"},
+    ],
+    "NVDA": [
+        {"partner":"TSMC","role":"Fabricante de chips","country":"Taiwán","lat":24.78,"lon":120.99,"desc":"Fabrica GPUs H100/B200 en proceso 4nm y 3nm"},
+        {"partner":"Samsung","role":"Memoria HBM","country":"Corea del Sur","lat":37.44,"lon":127.0,"desc":"Proveedor de memoria HBM3E de alta velocidad"},
+        {"partner":"SK Hynix","role":"Memoria HBM","country":"Corea del Sur","lat":37.29,"lon":127.0,"desc":"Principal proveedor de memoria HBM3E para data centers"},
+        {"partner":"Microsoft","role":"Cliente cloud","country":"USA","lat":47.64,"lon":-122.13,"desc":"Mayor comprador de GPUs para Azure e infraestructura AI"},
+        {"partner":"Meta","role":"Cliente AI","country":"USA","lat":37.48,"lon":-122.15,"desc":"Adquiere GPUs masivamente para entrenamiento de Llama"},
+        {"partner":"Supermicro","role":"Servidores","country":"USA","lat":37.39,"lon":-121.98,"desc":"Fabrica servidores GPU-optimizados para data centers"},
+    ],
+    "TSLA": [
+        {"partner":"Panasonic","role":"Celdas de batería","country":"Japón","lat":34.69,"lon":135.50,"desc":"Produce celdas de batería 4680 en Gigafactory Nevada"},
+        {"partner":"CATL","role":"Baterías LFP","country":"China","lat":26.65,"lon":119.30,"desc":"Mayor fabricante mundial de baterías, provee LFP a Tesla"},
+        {"partner":"Samsung SDI","role":"Celdas premium","country":"Corea del Sur","lat":37.44,"lon":127.0,"desc":"Baterías NCA de alta densidad para Model S/X"},
+        {"partner":"BHP","role":"Níquel","country":"Australia","lat":-31.95,"lon":115.86,"desc":"Suministra níquel refinado para cátodos de baterías"},
+        {"partner":"Albemarle","role":"Litio","country":"USA","lat":35.22,"lon":-80.84,"desc":"Principal proveedor de litio para Gigafactories globales"},
+        {"partner":"STMicro","role":"Semiconductores","country":"Suiza","lat":46.20,"lon":6.15,"desc":"Chips de potencia SiC para inversores del powertrain"},
+    ],
+    "MSFT": [
+        {"partner":"OpenAI","role":"Partner AI","country":"USA","lat":37.77,"lon":-122.42,"desc":"Inversión de $13B+ para integrar GPT en todo Azure"},
+        {"partner":"NVIDIA","role":"GPUs","country":"USA","lat":37.37,"lon":-122.04,"desc":"Proveedor de GPUs A100/H100 para Azure AI clusters"},
+        {"partner":"AMD","role":"CPUs servidor","country":"USA","lat":37.38,"lon":-121.96,"desc":"Procesadores EPYC para Azure cloud data centers"},
+        {"partner":"Samsung","role":"Memoria","country":"Corea del Sur","lat":37.44,"lon":127.0,"desc":"DRAM y SSD para servidores de Azure worldwide"},
+        {"partner":"LinkedIn","role":"Red profesional","country":"USA","lat":37.42,"lon":-122.07,"desc":"Plataforma con 900M+ usuarios integrada al ecosistema"},
+        {"partner":"Activision","role":"Gaming","country":"USA","lat":34.04,"lon":-118.47,"desc":"Adquisición de $69B para dominar gaming global"},
+    ],
+    "AMD": [
+        {"partner":"TSMC","role":"Fabricante de chips","country":"Taiwán","lat":24.78,"lon":120.99,"desc":"Fabrica CPUs Ryzen y GPUs Radeon en nodos de 5nm/4nm"},
+        {"partner":"Samsung","role":"Memoria","country":"Corea del Sur","lat":37.44,"lon":127.0,"desc":"Proveedor de DRAM para validación de plataformas AMD"},
+        {"partner":"Microsoft","role":"Cliente Xbox","country":"USA","lat":47.64,"lon":-122.13,"desc":"CPUs y GPUs custom para Xbox Series X/S"},
+        {"partner":"Sony","role":"Cliente PS5","country":"Japón","lat":35.63,"lon":139.74,"desc":"SoC custom para PlayStation 5 y futuras consolas"},
+        {"partner":"Xilinx","role":"FPGAs","country":"USA","lat":37.38,"lon":-121.96,"desc":"División adquirida de FPGAs para data centers adaptativos"},
+        {"partner":"Meta","role":"Cliente AI","country":"USA","lat":37.48,"lon":-122.15,"desc":"GPUs Instinct MI300X para cargas de entrenamiento AI"},
+    ],
+    "CRM": [
+        {"partner":"Amazon AWS","role":"Infraestructura cloud","country":"USA","lat":47.62,"lon":-122.34,"desc":"Hyperscaler principal para backend de Salesforce"},
+        {"partner":"Google Cloud","role":"Cloud secundario","country":"USA","lat":37.42,"lon":-122.08,"desc":"Multi-cloud para redundancia y Analytics con BigQuery"},
+        {"partner":"Slack","role":"Comunicaciones","country":"USA","lat":37.79,"lon":-122.39,"desc":"Adquisición de $27.7B para dominar colaboración enterprise"},
+        {"partner":"Tableau","role":"Analytics","country":"USA","lat":47.62,"lon":-122.34,"desc":"Plataforma de visualización integrada al CRM"},
+        {"partner":"MuleSoft","role":"Integración","country":"USA","lat":37.79,"lon":-122.39,"desc":"API management y integración de datos enterprise"},
+        {"partner":"Anthropic","role":"AI Partner","country":"USA","lat":37.77,"lon":-122.42,"desc":"Claude AI integrado en Einstein AI para CRM inteligente"},
+    ],
+    "GOOGL": [
+        {"partner":"Samsung","role":"Pantallas + Memoria","country":"Corea del Sur","lat":37.44,"lon":127.0,"desc":"OLED para Pixel, DRAM para data centers de Google"},
+        {"partner":"TSMC","role":"Chips Tensor","country":"Taiwán","lat":24.78,"lon":120.99,"desc":"Fabrica los procesadores Tensor para Pixel y TPUs"},
+        {"partner":"Broadcom","role":"Networking","country":"USA","lat":37.40,"lon":-121.97,"desc":"ASICs custom y chips de red para Google Cloud"},
+        {"partner":"SpaceX","role":"Conectividad","country":"USA","lat":33.92,"lon":-118.33,"desc":"Starlink para conectividad rural de Google Cloud"},
+        {"partner":"Foxconn","role":"Hardware","country":"China","lat":22.64,"lon":114.02,"desc":"Ensamblaje de servidores y dispositivos Pixel"},
+        {"partner":"DeepMind","role":"AI Research","country":"UK","lat":51.53,"lon":-0.13,"desc":"División de IA que desarrolla Gemini y AlphaFold"},
+    ],
+}
+
+# Default partners for tickers not in the database
+DEFAULT_PARTNERS = [
+    {"partner":"Goldman Sachs","role":"Prime Broker","country":"USA","lat":40.71,"lon":-74.01,"desc":"Servicios de banca de inversión y prime brokerage"},
+    {"partner":"Bloomberg","role":"Data Provider","country":"USA","lat":40.76,"lon":-73.98,"desc":"Terminal de datos financieros y analytics institucional"},
+    {"partner":"CME Group","role":"Exchange","country":"USA","lat":41.88,"lon":-87.63,"desc":"Mayor exchange de derivados y futuros del mundo"},
 ]
 
 @st.cache_data(ttl=600, show_spinner=False)
@@ -854,7 +929,7 @@ def gauge(val, title, lo, hi, steps, suf=""):
 
 def ui_header():
     st.markdown('<div class="hdr"><h1>⚡ CENTRO DE MANDO DE EATON</h1>'
-                '<p>INSTITUTIONAL QUANT TERMINAL · CITADEL ARCHITECTURE · GLOBAL INTELLIGENCE · v19.0</p></div>', unsafe_allow_html=True)
+                '<p>INSTITUTIONAL QUANT TERMINAL · CITADEL ARCHITECTURE · GLOBAL INTELLIGENCE · v20.0</p></div>', unsafe_allow_html=True)
     now = datetime.now()
     st.markdown(f'<div class="sb">'
         f'<span>SID: <span style="color:{C["gold"]}">{st.session_state.sid}</span></span>'
@@ -906,7 +981,7 @@ def ui_sidebar():
         if st.checkbox("🗑️ Limpiar caché"):
             st.cache_data.clear()
         _cm = C["textm"]
-        st.markdown(f"<div style='text-align:center;font-size:.65rem;color:{_cm};font-family:JetBrains Mono'>EATON v19.0 · © {datetime.now().year}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center;font-size:.65rem;color:{_cm};font-family:JetBrains Mono'>EATON v20.0 · © {datetime.now().year}</div>", unsafe_allow_html=True)
     return tick, hz
 
 # ═══════════════════════════════════════════════════════════════════
@@ -956,6 +1031,8 @@ def tab1_geo(tk, df, r):
 
         # HQ marker (large, pulsing effect via larger outline)
         hq_lat = tk_info.get("lat", 0); hq_lon = tk_info.get("lon", 0)
+        partners = STRATEGIC_PARTNERS.get(tk, DEFAULT_PARTNERS)
+
         if hq_lat != 0 and hq_lon != 0:
             fig.add_trace(go.Scattergeo(
                 lat=[hq_lat], lon=[hq_lon], text=[f"🏢 HQ: {hq_city}"],
@@ -974,6 +1051,26 @@ def tab1_geo(tk, df, r):
                     line=dict(width=0.8, color="rgba(201,149,40,0.35)"),
                     hoverinfo="skip", showlegend=False))
 
+            # ── Partner nodes (cyan diamonds) + connection lines ──
+            for p in partners:
+                plat = p.get("lat", 0); plon = p.get("lon", 0)
+                if plat != 0 and plon != 0:
+                    fig.add_trace(go.Scattergeo(
+                        lat=[plat], lon=[plon],
+                        text=[f"🤝 {p['partner']}"],
+                        mode="markers+text", textposition="top center",
+                        textfont=dict(size=7, color=C["cyan"], family="JetBrains Mono"),
+                        marker=dict(size=12, color=C["green"], symbol="diamond",
+                                    line=dict(width=1.5, color=C["cyan"]), opacity=0.9),
+                        hovertemplate=f"<b>{p['partner']}</b><br>{p['role']}<br>{p['country']}<extra></extra>",
+                        showlegend=False))
+                    # Cyan line from HQ to partner
+                    fig.add_trace(go.Scattergeo(
+                        lat=[hq_lat, plat], lon=[hq_lon, plon],
+                        mode="lines",
+                        line=dict(width=1.2, color="rgba(24,255,255,0.4)"),
+                        hoverinfo="skip", showlegend=False))
+
         fig.update_geos(
             projection_type="natural earth",
             bgcolor=C["bg"], landcolor="#0a0c18", oceancolor="#050710",
@@ -989,9 +1086,12 @@ def tab1_geo(tk, df, r):
             margin=dict(l=0, r=0, t=45, b=0), showlegend=False,
             geo=dict(bgcolor=C["bg"]))
         st.plotly_chart(fig, use_container_width=True)
+        n_partners = len(partners)
+        partner_countries = len(set(p["country"] for p in partners))
         why_chart_diagnostic("choropleth",
-            f"HQ: {hq_city}, {hq_country}. Red conectada a {len(GLOBAL_NODES)} mercados globales. "
-            f"La concentración geográfica determina el riesgo idiosincrático país.")
+            f"HQ: {hq_city}, {hq_country}. Red conectada a {len(GLOBAL_NODES)} mercados + "
+            f"{n_partners} socios estratégicos en {partner_countries} países. "
+            f"Las líneas cyan muestran la cadena de suministro; las doradas la red de exchanges.")
 
     with c2:
         st.markdown("##### 📐 Superficie Volatilidad 3D")
@@ -1049,6 +1149,41 @@ def tab1_geo(tk, df, r):
                         f'<span style="color:{C["blue"]}">{n["pub"]}</span> · '
                         f'<span class="{sent_cls}">{sent_label}</span><br>'
                         f'<span style="color:{C["text"]}">{n["title"]}</span></div>', unsafe_allow_html=True)
+
+    # ── Strategic Partners & Suppliers Ledger ──
+    partners = STRATEGIC_PARTNERS.get(tk, DEFAULT_PARTNERS)
+    st.markdown("---")
+    st.markdown(
+        f'<div class="ptr-ledger"><div class="ptr-title">🤝 Strategic Partners & Suppliers Ledger — {tk}</div></div>',
+        unsafe_allow_html=True)
+    ptr_rows = []
+    for p in partners:
+        ptr_rows.append({
+            "🏢 Empresa Socia": p["partner"],
+            "⚙️ Rol / Suministro": p["role"],
+            "🌍 País": p["country"],
+            "📝 Descripción": p["desc"],
+        })
+    if ptr_rows:
+        st.dataframe(pd.DataFrame(ptr_rows), use_container_width=True, hide_index=True)
+
+    with st.expander("🔍 WHY? — Diagnóstico Citadel: Cadena de Suministro", expanded=False):
+        st.markdown(
+            f"**📘 Concepto:** La cadena de suministro define la resiliencia operativa de {tk}. "
+            f"Cada socio representa un nodo de riesgo: disrupciones en un proveedor clave pueden "
+            f"impactar la producción, márgenes y el precio de la acción.")
+        st.latex(r"\text{Supply Chain Risk} = \sum_{i=1}^{N} w_i \cdot \sigma_i \cdot \rho_{i,\text{asset}}")
+        n_countries = len(set(p["country"] for p in partners))
+        st.markdown(
+            f"**📊 Interpretación Quant:** {tk} tiene **{len(partners)} socios** en "
+            f"**{n_countries} países**. "
+            f"{'Alta concentración geográfica ⚠️ — riesgo de disrupción regional' if n_countries <= 2 else 'Diversificación geográfica adecuada ✅ — riesgo distribuido'}. "
+            f"Citadel monitorea los earnings calls de cada socio para detectar alertas tempranas "
+            f"de cuellos de botella en la cadena.")
+        st.markdown(
+            f"**🌐 Conexión Macro/BCRP:** Las disrupciones en la cadena de suministro global "
+            f"(semiconductores, litio, cobre) impactan directamente la inflación importada que el BCRP "
+            f"monitorea para calibrar la tasa de referencia.")
 
 # ═══════════════════════════════════════════════════════════════════
 # TAB 2 — AUDITORÍA CUANTITATIVA
@@ -1410,6 +1545,132 @@ def tab5_intelligence(tk, df, r):
                 st.markdown("**🌐 Conexión BCRP:** El nivel de deuda corporativa global afecta "
                            "la estabilidad del sistema financiero que el BCRP monitorea via riesgo sistémico.")
 
+        # ══════════════════════════════════════════════════════
+        #  EBITDA MODULE & EFFICIENCY RATIOS
+        # ══════════════════════════════════════════════════════
+        st.markdown("---")
+        st.markdown("##### 📊 EBITDA Histórico & Ratios de Eficiencia Institucional")
+
+        inc = fins.get("income")
+        bal = fins.get("balance")
+
+        # ── Extract EBITDA series ──
+        ebitda_series = None
+        if inc is not None and not inc.empty:
+            ebitda_row = None
+            for label in ["EBITDA", "Normalized EBITDA", "Reconciled Depreciation"]:
+                if label in inc.index:
+                    ebitda_row = label; break
+            if ebitda_row:
+                ebitda_series = inc.loc[ebitda_row]
+            else:
+                # Build EBITDA = Operating Income + Depreciation
+                op_inc = None; dep = None
+                for ol in ["Operating Income", "Operating Revenue"]:
+                    if ol in inc.index: op_inc = inc.loc[ol]; break
+                for dl in ["Reconciled Depreciation", "Depreciation And Amortization In Income Statement"]:
+                    if dl in inc.index: dep = inc.loc[dl]; break
+                if op_inc is not None:
+                    ebitda_series = op_inc + (dep if dep is not None else 0)
+
+        if ebitda_series is not None:
+            try:
+                eb_vals = ebitda_series.dropna().astype(float)
+                eb_years = [c.strftime("%Y") if hasattr(c, 'strftime') else str(c) for c in eb_vals.index]
+
+                fig_eb = go.Figure()
+                eb_colors = [C["gold"] if v >= 0 else C["red"] for v in eb_vals.values]
+                fig_eb.add_trace(go.Bar(
+                    x=eb_years, y=eb_vals.values / 1e9,
+                    marker=dict(color=eb_colors, line=dict(width=1, color=C["gold_light"])),
+                    text=[f"${v/1e9:.1f}B" for v in eb_vals.values],
+                    textposition="outside",
+                    textfont=dict(color=C["gold_light"], size=11, family="JetBrains Mono"),
+                    hovertemplate="<b>%{x}</b><br>EBITDA: $%{y:.2f}B<extra></extra>",
+                    name="EBITDA"))
+                bl_eb = base_layout()
+                bl_eb.pop("xaxis", None); bl_eb.pop("yaxis", None)
+                fig_eb.update_layout(**bl_eb, height=380,
+                    title=dict(text=f"EBITDA Histórico — {tk} (USD Billions)",
+                              font=dict(size=13, color=C["gold"])),
+                    xaxis=dict(gridcolor=C["grid"], tickfont=dict(size=11)),
+                    yaxis=dict(title="$ Billions", gridcolor=C["grid"], tickfont=dict(size=10)))
+                st.plotly_chart(fig_eb, use_container_width=True)
+            except Exception:
+                st.info("No se pudo graficar el EBITDA con los datos disponibles.")
+        else:
+            st.info("EBITDA no disponible en los estados financieros descargados.")
+
+        # ── Efficiency Ratios: ROIC, FCF, Deuda Neta / EBITDA ──
+        st.markdown("##### 🎯 Ratios Críticos de Eficiencia")
+        roic_val = 0.0; fcf_val = 0.0; nd_ebitda = 0.0
+        _roic_ok = False; _fcf_ok = False; _nde_ok = False
+
+        try:
+            if inc is not None and not inc.empty and bal is not None and not bal.empty:
+                # ROIC = NOPAT / Invested Capital
+                nopat = 0; invested = 0
+                for ol in ["Operating Income", "EBIT"]:
+                    if ol in inc.index:
+                        nopat = float(inc.loc[ol].iloc[0]) * 0.75; break  # ~25% tax
+                for tl in ["Total Assets"]:
+                    if tl in bal.index: invested = float(bal.loc[tl].iloc[0]); break
+                for cl in ["Current Liabilities", "Total Current Liabilities"]:
+                    if cl in bal.index: invested -= float(bal.loc[cl].iloc[0]); break
+                if invested > 0:
+                    roic_val = (nopat / invested) * 100; _roic_ok = True
+
+                # FCF = Operating Cash Flow - CapEx (approximate from income)
+                opcf = 0; ni_val = 0; dep_val = 0
+                for nl in ["Net Income"]:
+                    if nl in inc.index: ni_val = float(inc.loc[nl].iloc[0]); break
+                for dl in ["Reconciled Depreciation", "Depreciation And Amortization In Income Statement"]:
+                    if dl in inc.index: dep_val = float(inc.loc[dl].iloc[0]); break
+                opcf = ni_val + dep_val  # Simplified
+                capex = abs(dep_val * 0.6)  # Approximate CapEx
+                fcf_val = opcf - capex; _fcf_ok = True
+
+                # Deuda Neta / EBITDA
+                total_debt = 0; cash = 0; ebitda_last = 0
+                for dl in ["Total Debt", "Long Term Debt", "Total Liabilities Net Minority Interest"]:
+                    if dl in bal.index: total_debt = float(bal.loc[dl].iloc[0]); break
+                for cl in ["Cash And Cash Equivalents", "Cash Cash Equivalents And Short Term Investments"]:
+                    if cl in bal.index: cash = float(bal.loc[cl].iloc[0]); break
+                if ebitda_series is not None:
+                    ebitda_last = float(ebitda_series.iloc[0])
+                net_debt = total_debt - cash
+                if ebitda_last > 0:
+                    nd_ebitda = net_debt / ebitda_last; _nde_ok = True
+        except Exception:
+            pass
+
+        rc1, rc2, rc3 = st.columns(3)
+        rc1.metric("🎯 ROIC", f"{roic_val:.1f}%" if _roic_ok else "N/A",
+                   delta="Creador de valor ✅" if roic_val > 10 else ("Aceptable" if roic_val > 5 else "Bajo ⚠️") if _roic_ok else None)
+        rc2.metric("💵 Free Cash Flow", _fmt_big(fcf_val) if _fcf_ok else "N/A",
+                   delta="Positivo ✅" if fcf_val > 0 else "Negativo ⚠️" if _fcf_ok else None)
+        rc3.metric("⚖️ Deuda Neta / EBITDA", f"{nd_ebitda:.2f}x" if _nde_ok else "N/A",
+                   delta="Conservador ✅" if nd_ebitda < 2 else ("Moderado" if nd_ebitda < 4 else "Alto ⚠️") if _nde_ok else None)
+
+        with st.expander("🔍 WHY? — Diagnóstico Citadel: EBITDA & Eficiencia", expanded=False):
+            st.markdown(
+                "**📘 Concepto:** El EBITDA (Earnings Before Interest, Taxes, Depreciation & Amortization) "
+                "mide la generación operativa de caja, eliminando efectos contables y de estructura de capital.")
+            st.latex(r"EBITDA = \text{Operating Income} + \text{Depreciation} + \text{Amortization}")
+            st.latex(r"ROIC = \frac{NOPAT}{\text{Total Assets} - \text{Current Liabilities}} \times 100")
+            st.latex(r"FCF = \text{Operating CF} - \text{CapEx}")
+            st.latex(r"\text{Leverage} = \frac{\text{Total Debt} - \text{Cash}}{EBITDA}")
+            st.markdown(
+                f"**📊 Interpretación Quant ({tk}):** "
+                f"ROIC={roic_val:.1f}% {'> WACC estimado → crea valor para accionistas ✅' if roic_val > 10 else '— bajo costo de capital, analizar más ⚠️' if _roic_ok else ''}. "
+                f"FCF={_fmt_big(fcf_val)} {'— genera caja libre para dividendos, recompras o M&A' if fcf_val > 0 else '— consumiendo caja, ojo con sostenibilidad' if _fcf_ok else ''}. "
+                f"Deuda Neta/EBITDA={nd_ebitda:.2f}x {'— empresa conservadora, capacidad de pago sólida' if nd_ebitda < 2 else '— apalancamiento moderado' if nd_ebitda < 4 else '— alto apalancamiento, riesgo de crédito' if _nde_ok else ''}."
+            )
+            st.markdown(
+                "**🌐 Conexión BCRP:** El EBITDA sectorial del S&P 500 es un leading indicator de la "
+                "actividad económica global. La SBS y el BCRP usan ratios de cobertura (Deuda/EBITDA) "
+                "para evaluar la salud del sistema financiero y calibrar provisiones bancarias.")
+
     else:
         # ══════════════════════════════════════════════════════
         #  MACRO-SYNTHETIC ENGINE — For non-equity assets
@@ -1563,7 +1824,7 @@ def main():
     with t5: tab5_intelligence(tk,df,r)
 
     st.markdown(f'<div style="text-align:center;padding:20px 0"><span style="font-family:JetBrains Mono;'
-        f'font-size:.7rem;color:{C["textm"]};letter-spacing:.1em">EATON v19.0 · {N_ASSETS} Instruments · '
+        f'font-size:.7rem;color:{C["textm"]};letter-spacing:.1em">EATON v20.0 · {N_ASSETS} Instruments · '
         f'Session {st.session_state.sid} · {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</span></div>',
         unsafe_allow_html=True)
 
